@@ -1,0 +1,87 @@
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
+import { useAuth } from '../hooks/useAuth';
+import api from '../lib/api';
+import DashboardLayout from '../components/layouts/DashboardLayout';
+import PortfolioChart from '../components/dashboard/PortfolioChart';
+import TeamList from '../components/dashboard/TeamList';
+import NewsFeed from '../components/dashboard/NewsFeed';
+import RewardsWidget from '../components/dashboard/RewardsWidget';
+import LeaderboardWidget from '../components/dashboard/LeaderboardWidget';
+
+export default function Dashboard() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+  const [portfolioData, setPortfolioData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/auth/login');
+    } else if (user) {
+      fetchPortfolioData();
+    }
+  }, [user, loading]);
+  
+  const fetchPortfolioData = async () => {
+    try {
+      const response = await api.get('/portfolio');
+      setPortfolioData(response.data);
+    } catch (error) {
+      setError('Failed to load portfolio data');
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  if (loading || isLoading) {
+    return <div>Loading...</div>;
+  }
+  
+  if (error) {
+    return <div>Error: {error}</div>;
+  }
+  
+  return (
+    <DashboardLayout>
+      {/* Portfolio Overview */}
+      <div className="mb-8">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold text-gray-800">Portfolio</h2>
+          <div className="flex items-center">
+            <span className="text-green-600 font-bold text-xl">
+              ${portfolioData?.totalValue.toFixed(2)}
+            </span>
+            <span className={`ml-2 flex items-center text-sm ${
+              portfolioData?.performance.dailyChangePercentage >= 0 
+                ? 'text-green-500' 
+                : 'text-red-500'
+            }`}>
+              {/* Icon here */}
+              {portfolioData?.performance.dailyChangePercentage >= 0 ? '+' : ''}
+              {portfolioData?.performance.dailyChangePercentage.toFixed(2)}%
+            </span>
+          </div>
+        </div>
+        
+        <PortfolioChart data={portfolioData?.chartData} />
+      </div>
+      
+      {/* Team Holdings */}
+      <TeamList teams={portfolioData?.holdings} />
+      
+      {/* Two Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <NewsFeed />
+        </div>
+        <div>
+          <RewardsWidget />
+          <LeaderboardWidget />
+        </div>
+      </div>
+    </DashboardLayout>
+  );
+}
